@@ -31,72 +31,79 @@ public abstract class GetNetworkTask extends NetworkTask {
     @Override
     protected MendeleyException doInBackground(String... params) {
         String url = params[0];
-        HttpGet httpGet;
-
+        
         if (USE_APACHE) {
-            try {
-                HttpClient httpclient = new DefaultHttpClient();
-                httpGet = NetworkUtils.getApacheDownloadConnection(url, getContentType(), getAccessTokenProvider());
-
-                try {
-                    HttpResponse response = httpclient.execute(httpGet);
-                    getResponseHeaders(response);
-
-                    final int responseCode = response.getStatusLine().getStatusCode();
-                    if (responseCode != getExpectedResponse()) {
-                        return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
-                    } else {
-
-                        if (isCancelled()) {
-                            return new UserCancelledException();
-                        }
-
-                        HttpEntity entity = response.getEntity();
-                        String responseString = EntityUtils.toString(entity, "UTF-8");
-                        processJsonString(responseString);
-                        return null;
-                    }
-                } catch (IOException e) {
-                    return new MendeleyException("Error reading server response: " + e.toString(), e);
-                } catch (JSONException e) {
-                    return new JsonParsingException("Error reading server response: " + e.toString(), e);
-                } finally {
-                    closeConnection();
-                }
-
-            } catch (Exception e) {
-                return new MendeleyException("Error reading server response: " + e.toString(), e);
-            }
+            return doInBackroundApache(url);
         } else {
+            return doInBackGroumd(url);
+        }
+    }
+
+    protected MendeleyException doInBackroundApache(String url) {
+        try {
+            HttpClient httpclient = new DefaultHttpClient();
+            HttpGet httpGet = NetworkUtils.getApacheDownloadConnection(url, getContentType(), getAccessTokenProvider());
+
             try {
-                con = NetworkUtils.getConnection(url, "GET", getAccessTokenProvider());
-                con.addRequestProperty("Content-type", getContentType());
-                con.connect();
+                HttpResponse response = httpclient.execute(httpGet);
+                getResponseHeaders(response);
 
-                getResponseHeaders();
-
-                final int responseCode = con.getResponseCode();
+                final int responseCode = response.getStatusLine().getStatusCode();
                 if (responseCode != getExpectedResponse()) {
-                    return new HttpResponseException(responseCode,  NetworkUtils.getErrorMessage(con));
+                    return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
+                } else {
+
+                    if (isCancelled()) {
+                        return new UserCancelledException();
+                    }
+
+                    HttpEntity entity = response.getEntity();
+                    String responseString = EntityUtils.toString(entity, "UTF-8");
+                    processJsonString(responseString);
+                    return null;
                 }
-
-                if (isCancelled()) {
-                    return new UserCancelledException();
-                }
-
-                is = con.getInputStream();
-                String jsonString =  NetworkUtils.getJsonString(is);
-                processJsonString(jsonString);
-                return null;
-
-
+            } catch (IOException e) {
+                return new MendeleyException("Error reading server response: " + e.toString(), e);
             } catch (JSONException e) {
-                return new JsonParsingException("Error parsing server response: " + e.toString(), e);
-            } catch (Exception e) {
-                return new MendeleyException("Error reading server response: " + e.toString() , e);
+                return new JsonParsingException("Error reading server response: " + e.toString(), e);
             } finally {
                 closeConnection();
             }
+
+        } catch (Exception e) {
+            return new MendeleyException("Error reading server response: " + e.toString(), e);
+        }
+    }
+
+    protected MendeleyException doInBackGroumd(String url) {
+        try {
+            con = NetworkUtils.getConnection(url, "GET", getAccessTokenProvider());
+            con.addRequestProperty("Content-type", getContentType());
+            con.connect();
+
+            getResponseHeaders();
+
+            final int responseCode = con.getResponseCode();
+            if (responseCode != getExpectedResponse()) {
+                return new HttpResponseException(responseCode,  NetworkUtils.getErrorMessage(con));
+            }
+
+            if (isCancelled()) {
+                return new UserCancelledException();
+            }
+
+            is = con.getInputStream();
+            String jsonString =  NetworkUtils.getJsonString(is);
+            processJsonString(jsonString);
+            return null;
+
+
+        } catch (JSONException e) {
+            return new JsonParsingException("Error parsing server response: " + e.toString(), e);
+        } catch (Exception e) {
+            return new MendeleyException("Error reading server response: " + e.toString() , e);
+        } finally {
+            closeConnection();
         }
     }
 
