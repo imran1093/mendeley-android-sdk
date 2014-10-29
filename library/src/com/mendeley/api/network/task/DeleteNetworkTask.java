@@ -27,7 +27,7 @@ public abstract class DeleteNetworkTask extends NetworkTask {
             con = getConnection(url, "DELETE", getAccessTokenProvider());
             con.connect();
 
-            getResponseHeaders(null);
+            getResponseHeaders();
 
             final int responseCode = con.getResponseCode();
             if (responseCode != getExpectedResponse()) {

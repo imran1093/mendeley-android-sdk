@@ -30,6 +30,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.params.BasicHttpParams;
@@ -291,6 +292,7 @@ public class FileNetworkProvider {
         private String tempFilePath;
         private String finalFilePath;
 
+
         /**
          * @param fileName if null, use the name from the file itself.
          */
@@ -314,6 +316,7 @@ public class FileNetworkProvider {
         @Override
 		protected MendeleyException doInBackground(String... params) {
 			String url = params[0];
+            HttpGet httpGet;
 
 			FileOutputStream fileOutputStream = null;
 
@@ -500,7 +503,7 @@ public class FileNetworkProvider {
                 inputStream.close();
                 con.connect();
 
-                getResponseHeaders(null);
+                getResponseHeaders();
 
                 final int responseCode = con.getResponseCode();
                 if (responseCode != getExpectedResponse()) {

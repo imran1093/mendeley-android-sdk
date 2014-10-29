@@ -3,6 +3,7 @@ package com.mendeley.api.network.task;
 import com.mendeley.api.exceptions.HttpResponseException;
 import com.mendeley.api.exceptions.JsonParsingException;
 import com.mendeley.api.exceptions.MendeleyException;
+import com.mendeley.api.exceptions.UserCancelledException;
 import com.mendeley.api.network.NetworkUtils;
 
 import org.apache.http.HttpEntity;
@@ -19,6 +20,9 @@ import java.io.IOException;
  * A NetworkTask specialised for making HTTP GET requests.
  */
 public abstract class GetNetworkTask extends NetworkTask {
+
+    private final static boolean USE_APACHE = true;
+
     @Override
     protected int getExpectedResponse() {
         return 200;
@@ -27,35 +31,72 @@ public abstract class GetNetworkTask extends NetworkTask {
     @Override
     protected MendeleyException doInBackground(String... params) {
         String url = params[0];
-        HttpGet httpGet = null;
+        HttpGet httpGet;
 
-        try {
-            HttpClient httpclient = new DefaultHttpClient();
-            httpGet = NetworkUtils.getApacheDownloadConnection(url, getContentType(), getAccessTokenProvider());
-
+        if (USE_APACHE) {
             try {
-                HttpResponse response = httpclient.execute(httpGet);
-                getResponseHeaders(response);
+                HttpClient httpclient = new DefaultHttpClient();
+                httpGet = NetworkUtils.getApacheDownloadConnection(url, getContentType(), getAccessTokenProvider());
 
-                final int responseCode = response.getStatusLine().getStatusCode();
-                if (responseCode != getExpectedResponse()) {
-                    return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
-                } else {
-                    HttpEntity entity = response.getEntity();
-                    String responseString = EntityUtils.toString(entity, "UTF-8");
-                    processJsonString(responseString);
-                    return null;
+                try {
+                    HttpResponse response = httpclient.execute(httpGet);
+                    getResponseHeaders(response);
+
+                    final int responseCode = response.getStatusLine().getStatusCode();
+                    if (responseCode != getExpectedResponse()) {
+                        return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
+                    } else {
+
+                        if (isCancelled()) {
+                            return new UserCancelledException();
+                        }
+
+                        HttpEntity entity = response.getEntity();
+                        String responseString = EntityUtils.toString(entity, "UTF-8");
+                        processJsonString(responseString);
+                        return null;
+                    }
+                } catch (IOException e) {
+                    return new MendeleyException("Error reading server response: " + e.toString(), e);
+                } catch (JSONException e) {
+                    return new JsonParsingException("Error reading server response: " + e.toString(), e);
+                } finally {
+                    closeConnection();
                 }
-            } catch (IOException e) {
+
+            } catch (Exception e) {
                 return new MendeleyException("Error reading server response: " + e.toString(), e);
+            }
+        } else {
+            try {
+                con = NetworkUtils.getConnection(url, "GET", getAccessTokenProvider());
+                con.addRequestProperty("Content-type", getContentType());
+                con.connect();
+
+                getResponseHeaders();
+
+                final int responseCode = con.getResponseCode();
+                if (responseCode != getExpectedResponse()) {
+                    return new HttpResponseException(responseCode,  NetworkUtils.getErrorMessage(con));
+                }
+
+                if (isCancelled()) {
+                    return new UserCancelledException();
+                }
+
+                is = con.getInputStream();
+                String jsonString =  NetworkUtils.getJsonString(is);
+                processJsonString(jsonString);
+                return null;
+
+
             } catch (JSONException e) {
-                return new JsonParsingException("Error reading server response: " + e.toString(), e);
-            }         finally {
+                return new JsonParsingException("Error parsing server response: " + e.toString(), e);
+            } catch (Exception e) {
+                return new MendeleyException("Error reading server response: " + e.toString() , e);
+            } finally {
                 closeConnection();
             }
-
-        } catch (Exception e) {
-            return new MendeleyException("Error reading server response: " + e.toString(), e);
         }
     }
 
