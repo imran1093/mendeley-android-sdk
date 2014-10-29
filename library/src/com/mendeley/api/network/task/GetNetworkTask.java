@@ -1,5 +1,7 @@
 package com.mendeley.api.network.task;
 
+import android.util.Log;
+
 import com.mendeley.api.exceptions.HttpResponseException;
 import com.mendeley.api.exceptions.JsonParsingException;
 import com.mendeley.api.exceptions.MendeleyException;
@@ -31,7 +33,7 @@ public abstract class GetNetworkTask extends NetworkTask {
     @Override
     protected MendeleyException doInBackground(String... params) {
         String url = params[0];
-        
+
         if (USE_APACHE) {
             return doInBackroundApache(url);
         } else {

@@ -51,38 +51,7 @@ public abstract class NetworkTask extends AsyncTask<String, Integer, MendeleyExc
         for (Header header : headers) {
             String key = header.getName();
             if (key != null) {
-                switch (key) {
-                    case "Date":
-                        SimpleDateFormat simpledateformat = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss 'GMT'");
-                        try {
-                            serverDate = simpledateformat.parse(header.getValue());
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        break;
-                    case "Vary":
-                    case "Content-Type":
-                    case "X-Mendeley-Trace-Id":
-                    case "Connection":
-                    case "Content-Length":
-                    case "Content-Encoding":
-                    case "Mendeley-Count":
-                        // Unused
-                        break;
-                    case "Location":
-                        location = header.getValue();
-                        break;
-                    case "Link":
-                        String linkString = header.getValue();
-                        String link = "";
-                        try {
-                            link = linkString.substring(linkString.indexOf("<")+1, linkString.indexOf(">"));
-                        } catch (IndexOutOfBoundsException e) {}
-                        if (linkString.indexOf("next") != -1) {
-                            next = new Page(link);
-                        }
-                        break;
-                }
+                getResponseHeaders(key, header.getValue());
             }
         }
     }
@@ -99,41 +68,52 @@ public abstract class NetworkTask extends AsyncTask<String, Integer, MendeleyExc
         }
         for (String key : headersMap.keySet()) {
             if (key != null) {
-                switch (key) {
-                    case "Date":
-                        SimpleDateFormat simpledateformat = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss 'GMT'");
-                        try {
-                            serverDate = simpledateformat.parse(headersMap.get(key).get(0));
-                        } catch (ParseException e) {
-                            e.printStackTrace();
-                        }
-                        break;
-                    case "Vary":
-                    case "Content-Type":
-                    case "X-Mendeley-Trace-Id":
-                    case "Connection":
-                    case "Content-Length":
-                    case "Content-Encoding":
-                    case "Mendeley-Count":
-                        // Unused
-                        break;
-                    case "Location":
-                        location = headersMap.get(key).get(0);
-                        break;
-                    case "Link":
-                        List<String> links = headersMap.get(key);
-                        String linkString = null;
-                        for (String link : links) {
-                            try {
-                                linkString = link.substring(link.indexOf("<")+1, link.indexOf(">"));
-                            } catch (IndexOutOfBoundsException e) {}
-                            if (link.indexOf("next") != -1) {
-                                next = new Page(linkString);
-                            }
-                            // "last" and "prev" links are not used
-                        }
-                        break;
+                if (key.equals("Link")) {
+                    List<String> links = headersMap.get(key);
+                    for (String link : links) {
+                        getResponseHeaders(key, link);
+                    }
+                } else {
+                    getResponseHeaders(key, headersMap.get(key).get(0));
                 }
+
+            }
+        }
+    }
+
+    private void getResponseHeaders(String key, String value) {
+        if (key != null) {
+            switch (key) {
+                case "Date":
+                    SimpleDateFormat simpledateformat = new SimpleDateFormat("EEE, dd MMM yyyy kk:mm:ss 'GMT'");
+                    try {
+                        serverDate = simpledateformat.parse(value);
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
+                    break;
+                case "Vary":
+                case "Content-Type":
+                case "X-Mendeley-Trace-Id":
+                case "Connection":
+                case "Content-Length":
+                case "Content-Encoding":
+                case "Mendeley-Count":
+                    // Unused
+                    break;
+                case "Location":
+                    location = value;
+                    break;
+                case "Link":
+                    String linkString = value;
+                    try {
+                        linkString = value.substring(value.indexOf("<") + 1, value.indexOf(">"));
+                    } catch (IndexOutOfBoundsException e) {
+                    }
+                    if (value.indexOf("next") != -1) {
+                        next = new Page(linkString);
+                    }
+                    break;
             }
         }
     }
