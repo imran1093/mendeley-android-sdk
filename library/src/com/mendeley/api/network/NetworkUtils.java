@@ -2,8 +2,12 @@ package com.mendeley.api.network;
 
 import com.mendeley.api.auth.AccessTokenProvider;
 
+import org.apache.http.HttpConnection;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -195,5 +199,19 @@ public class NetworkUtils {
         }
 
         return data.toString();
+    }
+
+    public static HttpGet getApacheDownloadConnection(String url, String contentType, AccessTokenProvider accessTokenProvider) throws IOException {
+        HttpGet httpGet = new HttpGet(url);
+
+        if (accessTokenProvider != null) {
+            httpGet.setHeader("Authorization", "Bearer " + accessTokenProvider.getAccessToken());
+        }
+
+        if (contentType != null) {
+            httpGet.setHeader("Content-type", contentType);
+        }
+
+        return httpGet;
     }
 }

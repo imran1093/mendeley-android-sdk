@@ -16,6 +16,7 @@ import com.mendeley.api.exceptions.NoMorePagesException;
 import com.mendeley.api.model.File;
 import com.mendeley.api.network.Environment;
 import com.mendeley.api.network.JsonParser;
+import com.mendeley.api.network.NetworkUtils;
 import com.mendeley.api.network.NullRequest;
 import com.mendeley.api.network.procedure.GetNetworkProcedure;
 import com.mendeley.api.network.task.DeleteNetworkTask;
@@ -25,6 +26,15 @@ import com.mendeley.api.params.FileRequestParameters;
 import com.mendeley.api.params.Page;
 import com.mendeley.api.util.Utils;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
 
 import java.io.DataOutputStream;
@@ -308,47 +318,54 @@ public class FileNetworkProvider {
 			FileOutputStream fileOutputStream = null;
 
 			try {
-				con = getConnection(url, "GET", getAccessTokenProvider());
-				con.setInstanceFollowRedirects(false);
-				con.connect();
-				
-				getResponseHeaders();
+                HttpClient httpclient = new DefaultHttpClient();
+                httpGet = NetworkUtils.getApacheDownloadConnection(url, null, getAccessTokenProvider());
+                HttpParams httpParams = new BasicHttpParams();
+                httpParams.setParameter("http.protocol.handle-redirects",false);
+                httpGet.setParams(httpParams);
 
-				if (con.getResponseCode() != getExpectedResponse()) {
-					return new FileDownloadException("HTTP status error downloading file.", new HttpResponseException(con.getResponseCode(), "Server did NOT redirect to final file URL"), fileId);
-				} else {		
-					con.disconnect();
-					
-					con = getDownloadConnection(location, "GET");
-					con.connect();
-					
-					int responseCode = con.getResponseCode();
-					
-					if (responseCode != 200) {
-						return new FileDownloadException("HTTP status error downloading file.", new HttpResponseException(responseCode, getErrorMessage(con)), fileId);
-					} else {
+                try {
+                    HttpResponse response = httpclient.execute(httpGet);
+                    getResponseHeaders(response);
+
+                    final int responseCode = response.getStatusLine().getStatusCode();
+                    if (responseCode != getExpectedResponse()) {
+                        return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
+                    } else {
+                        httpGet.abort();
+                        httpclient = new DefaultHttpClient();
+                        httpGet = NetworkUtils.getApacheDownloadConnection(location, null, null);
+
+                        response = httpclient.execute(httpGet);
+                        getResponseHeaders(response);
+
+                        final int downloadResponseCode = response.getStatusLine().getStatusCode();
+                        if (downloadResponseCode != 200) {
+                            return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
+                        }
+
                         if (fileName == null) {
-                            String content = con.getHeaderFields().get("Content-Disposition").get(0);
+                            String content = response.getHeaders("Content-Disposition")[0].getValue();
                             fileName = content.substring(content.indexOf("\"") + 1, content.lastIndexOf("\""));
                         }
-						
-						finalFilePath = folderPath + java.io.File.separator + fileName;
+
+                        finalFilePath = folderPath + java.io.File.separator + fileName;
                         tempFilePath = finalFilePath + PARTIALLY_DOWNLOADED_EXTENSION;
 
-                        int fileLength = con.getContentLength();
-                        is = con.getInputStream();
-						fileOutputStream = new FileOutputStream(new java.io.File(tempFilePath));
-						
-						byte data[] = new byte[1024];
-			            long total = 0;
-			            int count;
-			            while ((count = is.read(data)) != -1 && !isCancelled()) {
-			                total += count;
-			                if (fileLength > 0) 
-			                    publishProgress((int) (total * 100 / fileLength));
-			                fileOutputStream.write(data, 0, count);
-			            }
-					    fileOutputStream.close();
+                        long fileLength = response.getEntity().getContentLength();
+                        is = response.getEntity().getContent();
+                        fileOutputStream = new FileOutputStream(new java.io.File(tempFilePath));
+
+                        byte data[] = new byte[1024];
+                        long total = 0;
+                        int count;
+                        while ((count = is.read(data)) != -1 && !isCancelled()) {
+                            total += count;
+                            if (fileLength > 0)
+                                publishProgress((int) (total * 100 / fileLength));
+                            fileOutputStream.write(data, 0, count);
+                        }
+                        fileOutputStream.close();
                         if (!isCancelled()) {
                             boolean renamedOk = renameFile();
                             if (!renamedOk) {
@@ -356,9 +373,13 @@ public class FileNetworkProvider {
                             }
                         }
 
-						return null;
-					}
-				}
+                        return null;
+                    }
+                } catch (IOException e) {
+                    return new MendeleyException("Error reading server response: " + e.toString(), e);
+                } finally {
+                    closeConnection();
+                }
 			}	catch (IOException e) {
 				return new FileDownloadException("Error reading file: " + e.getMessage(), e, fileId);
 			} finally {
@@ -479,7 +500,7 @@ public class FileNetworkProvider {
                 inputStream.close();
                 con.connect();
 
-                getResponseHeaders();
+                getResponseHeaders(null);
 
                 final int responseCode = con.getResponseCode();
                 if (responseCode != getExpectedResponse()) {

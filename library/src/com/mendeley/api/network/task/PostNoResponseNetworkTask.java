@@ -38,7 +38,7 @@ public abstract class PostNoResponseNetworkTask extends NetworkTask {
             writer.close();
             os.close();
 
-            getResponseHeaders();
+            getResponseHeaders(null);
 
             final int responseCode = con.getResponseCode();
             if (responseCode != getExpectedResponse()) {
