@@ -33,14 +33,13 @@ public abstract class NetworkTask extends AsyncTask<String, Integer, MendeleyExc
     protected HttpsURLConnection con;
     protected OutputStream os;
     protected InputStream is;
-    protected HttpGet httpGet = null;
 
     protected abstract int getExpectedResponse();
 
     protected abstract AccessTokenProvider getAccessTokenProvider();
 
     /**
-     * Extracts the headers from the given HttpsURLConnection object.
+     * Extracts from the Apache HttpResponse object.
      */
     protected void getResponseHeaders(HttpResponse response) throws IOException {
         Header[] headers = response == null ? null : response.getAllHeaders();
@@ -88,6 +87,9 @@ public abstract class NetworkTask extends AsyncTask<String, Integer, MendeleyExc
         }
     }
 
+    /**
+     * Extracts the headers from the given HttpsURLConnection object.
+     */
     protected void getResponseHeaders() throws IOException {
         Map<String, List<String>> headersMap = con.getHeaderFields();
         if (headersMap == null) {

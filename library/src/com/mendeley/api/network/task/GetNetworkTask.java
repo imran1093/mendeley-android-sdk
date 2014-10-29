@@ -8,6 +8,7 @@ import com.mendeley.api.network.NetworkUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONException;
@@ -26,6 +27,7 @@ public abstract class GetNetworkTask extends NetworkTask {
     @Override
     protected MendeleyException doInBackground(String... params) {
         String url = params[0];
+        HttpGet httpGet = null;
 
         try {
             HttpClient httpclient = new DefaultHttpClient();
