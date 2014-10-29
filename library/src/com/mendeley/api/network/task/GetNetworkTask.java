@@ -1,7 +1,5 @@
 package com.mendeley.api.network.task;
 
-import android.util.Log;
-
 import com.mendeley.api.exceptions.HttpResponseException;
 import com.mendeley.api.exceptions.JsonParsingException;
 import com.mendeley.api.exceptions.MendeleyException;
@@ -35,13 +33,13 @@ public abstract class GetNetworkTask extends NetworkTask {
         String url = params[0];
 
         if (USE_APACHE) {
-            return doInBackroundApache(url);
+            return doInBackgroundApache(url);
         } else {
-            return doInBackGroumd(url);
+            return doInBackgroundAndroid(url);
         }
     }
 
-    protected MendeleyException doInBackroundApache(String url) {
+    protected MendeleyException doInBackgroundApache(String url) {
         try {
             HttpClient httpclient = new DefaultHttpClient();
             HttpGet httpGet = NetworkUtils.getApacheDownloadConnection(url, getContentType(), getAccessTokenProvider());
@@ -77,7 +75,7 @@ public abstract class GetNetworkTask extends NetworkTask {
         }
     }
 
-    protected MendeleyException doInBackGroumd(String url) {
+    protected MendeleyException doInBackgroundAndroid(String url) {
         try {
             con = NetworkUtils.getConnection(url, "GET", getAccessTokenProvider());
             con.addRequestProperty("Content-type", getContentType());
