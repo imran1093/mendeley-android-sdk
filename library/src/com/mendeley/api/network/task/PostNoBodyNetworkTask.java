@@ -24,7 +24,7 @@ public abstract class PostNoBodyNetworkTask extends NetworkTask {
             con = getConnection(url, "POST", getAccessTokenProvider());
             con.connect();
 
-            getResponseHeaders(null);
+            getResponseHeaders();
 
             final int responseCode = con.getResponseCode();
             if (responseCode != getExpectedResponse()) {
