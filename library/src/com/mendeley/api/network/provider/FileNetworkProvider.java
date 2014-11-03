@@ -13,6 +13,7 @@ import com.mendeley.api.exceptions.HttpResponseException;
 import com.mendeley.api.exceptions.JsonParsingException;
 import com.mendeley.api.exceptions.MendeleyException;
 import com.mendeley.api.exceptions.NoMorePagesException;
+import com.mendeley.api.exceptions.UserCancelledException;
 import com.mendeley.api.model.File;
 import com.mendeley.api.network.Environment;
 import com.mendeley.api.network.JsonParser;
@@ -327,63 +328,59 @@ public class FileNetworkProvider {
                 httpParams.setParameter("http.protocol.handle-redirects",false);
                 httpGet.setParams(httpParams);
 
-                try {
-                    HttpResponse response = httpclient.execute(httpGet);
+
+                HttpResponse response = httpclient.execute(httpGet);
+                getResponseHeaders(response);
+
+                final int responseCode = response.getStatusLine().getStatusCode();
+                if (responseCode != getExpectedResponse()) {
+                    return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
+                } else {
+                    httpGet.abort();
+                    httpclient = new DefaultHttpClient();
+                    httpGet = NetworkUtils.getApacheDownloadConnection(location, null, null);
+
+                    response = httpclient.execute(httpGet);
                     getResponseHeaders(response);
 
-                    final int responseCode = response.getStatusLine().getStatusCode();
-                    if (responseCode != getExpectedResponse()) {
+                    final int downloadResponseCode = response.getStatusLine().getStatusCode();
+                    if (downloadResponseCode != 200) {
                         return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
-                    } else {
-                        httpGet.abort();
-                        httpclient = new DefaultHttpClient();
-                        httpGet = NetworkUtils.getApacheDownloadConnection(location, null, null);
-
-                        response = httpclient.execute(httpGet);
-                        getResponseHeaders(response);
-
-                        final int downloadResponseCode = response.getStatusLine().getStatusCode();
-                        if (downloadResponseCode != 200) {
-                            return new HttpResponseException(responseCode, NetworkUtils.getErrorMessage(response));
-                        }
-
-                        if (fileName == null) {
-                            String content = response.getHeaders("Content-Disposition")[0].getValue();
-                            fileName = content.substring(content.indexOf("\"") + 1, content.lastIndexOf("\""));
-                        }
-
-                        finalFilePath = folderPath + java.io.File.separator + fileName;
-                        tempFilePath = finalFilePath + PARTIALLY_DOWNLOADED_EXTENSION;
-
-                        long fileLength = response.getEntity().getContentLength();
-                        is = response.getEntity().getContent();
-                        fileOutputStream = new FileOutputStream(new java.io.File(tempFilePath));
-
-                        byte data[] = new byte[1024];
-                        long total = 0;
-                        int count;
-                        while ((count = is.read(data)) != -1 && !isCancelled()) {
-                            total += count;
-                            if (fileLength > 0)
-                                publishProgress((int) (total * 100 / fileLength));
-                            fileOutputStream.write(data, 0, count);
-                        }
-                        fileOutputStream.close();
-                        if (!isCancelled()) {
-                            boolean renamedOk = renameFile();
-                            if (!renamedOk) {
-                                return new FileDownloadException("Cannot rename downloaded file", fileId);
-                            }
-                        }
-
-                        return null;
                     }
-                } catch (IOException e) {
-                    return new MendeleyException("Error reading server response: " + e.toString(), e);
-                } finally {
-                    closeConnection();
+
+                    if (fileName == null) {
+                        String content = response.getHeaders("Content-Disposition")[0].getValue();
+                        fileName = content.substring(content.indexOf("\"") + 1, content.lastIndexOf("\""));
+                    }
+
+                    finalFilePath = folderPath + java.io.File.separator + fileName;
+                    tempFilePath = finalFilePath + PARTIALLY_DOWNLOADED_EXTENSION;
+
+                    long fileLength = response.getEntity().getContentLength();
+                    is = response.getEntity().getContent();
+                    fileOutputStream = new FileOutputStream(new java.io.File(tempFilePath));
+
+                    byte data[] = new byte[1024];
+                    long total = 0;
+                    int count;
+                    while ((count = is.read(data)) != -1 && !isCancelled()) {
+                        total += count;
+                        if (fileLength > 0)
+                            publishProgress((int) (total * 100 / fileLength));
+                        fileOutputStream.write(data, 0, count);
+                    }
+                    fileOutputStream.close();
+                    if (!isCancelled()) {
+                        boolean renamedOk = renameFile();
+                        if (!renamedOk) {
+                            return new FileDownloadException("Cannot rename downloaded file", fileId);
+                        }
+                        return null;
+                    } else {
+                        return new UserCancelledException();
+                    }
                 }
-			}	catch (IOException e) {
+			} catch (IOException e) {
 				return new FileDownloadException("Error reading file: " + e.getMessage(), e, fileId);
 			} finally {
 				closeConnection();
