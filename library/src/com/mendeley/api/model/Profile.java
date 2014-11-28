@@ -75,14 +75,18 @@ public class Profile {
 		
 		String educationString = "";
 		String employmentString = "";
-		
-		for (Education e : education) {
-			educationString = "\n" + e;
-		}
-		
-		for (Employment e : employment) {
-			employmentString = "\n" + e;
-		}
+
+        if (education != null) {
+            for (Education e : education) {
+                educationString = "\n" + e;
+            }
+        }
+
+        if (employment != null) {
+            for (Employment e : employment) {
+                employmentString = "\n" + e;
+            }
+        }
 		
 		return "location: " + location + 
 				", id: " + id + 
